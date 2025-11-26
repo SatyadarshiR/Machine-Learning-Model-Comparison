@@ -1,0 +1,199 @@
+import streamlit as st
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+from sklearn.datasets import make_moons, make_circles, make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.model_selection import train_test_split
+
+# ==========================================
+
+# ==========================================
+st.set_page_config(page_title="Algorithm Arena", page_icon="⚔️", layout="wide")
+
+
+st.markdown("""
+<style>
+    .stApp { background-color: #0e1117; }
+    .stMetric { background-color: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 10px; }
+    h1, h2, h3 { color: #00f2c3 !important; }
+    div[data-testid="stExpander"] { background-color: #1f2937; border-radius: 10px; }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# ==========================================
+def get_dataset(name, noise, n_samples):
+    if name == "Moons (Non-Linear)":
+        return make_moons(n_samples=n_samples, noise=noise, random_state=42)
+    elif name == "Circles (Complex)":
+        return make_circles(n_samples=n_samples, noise=noise, factor=0.5, random_state=42)
+    else:
+        return make_classification(n_samples=n_samples, n_features=2, n_redundant=0, 
+                                   n_informative=2, n_clusters_per_class=1, random_state=42)
+
+def plot_decision_boundary(model, X, y, title, color_scale):
+    # Create a mesh grid
+    x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+    y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.02),
+                         np.arange(y_min, y_max, 0.02))
+    
+  
+    Z = model.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+
+  
+    fig = go.Figure()
+    
+    
+    fig.add_trace(go.Contour(
+        z=Z, x=np.arange(x_min, x_max, 0.02), y=np.arange(y_min, y_max, 0.02),
+        showscale=False, opacity=0.4, colorscale=color_scale,
+        hoverinfo='skip'
+    ))
+
+    
+    fig.add_trace(go.Scatter(
+        x=X[:, 0], y=X[:, 1], mode='markers',
+        marker=dict(color=y, colorscale=color_scale, line=dict(width=1, color='white')),
+        text=y, name="Data Points"
+    ))
+
+    fig.update_layout(
+        title=title,
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font_color="white", xaxis_showgrid=False, yaxis_showgrid=False,
+        margin=dict(l=0, r=0, t=40, b=0), height=350
+    )
+    return fig
+
+def plot_radar_chart(metrics_lr, metrics_rf):
+    categories = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
+    
+    fig = go.Figure()
+
+    
+    fig.add_trace(go.Scatterpolar(
+        r=list(metrics_lr.values()), theta=categories,
+        fill='toself', name='Logistic Regression',
+        line_color='#00f2c3', opacity=0.7
+    ))
+
+
+    fig.add_trace(go.Scatterpolar(
+        r=list(metrics_rf.values()), theta=categories,
+        fill='toself', name='Random Forest',
+        line_color='#ff00ff', opacity=0.7
+    ))
+
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 1], color='gray')),
+        showlegend=True,
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        font_color="white", title="⚔️ Performance Stats Comparison",
+        margin=dict(l=40, r=40, t=40, b=40), height=400
+    )
+    return fig
+
+# ==========================================
+# ==========================================
+st.sidebar.header("🎮 Arena Settings")
+dataset_name = st.sidebar.selectbox("Select Battleground", ["Moons (Non-Linear)", "Circles (Complex)", "Linear Data"])
+noise_level = st.sidebar.slider("Noise Level (Difficulty)", 0.0, 0.5, 0.2)
+n_samples = st.sidebar.slider("Data Points", 100, 1000, 300)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🌲 Forest Config")
+n_estimators = st.sidebar.slider("Number of Trees", 1, 100, 10)
+
+# ==========================================
+
+# ==========================================
+st.title("⚔️ The Algorithm Arena")
+st.markdown("Comparing **Logistic Regression** (Linear) vs **Random Forest** (Non-Linear) in real-time.")
+
+X, y = get_dataset(dataset_name, noise_level, n_samples)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+
+
+model_lr = LogisticRegression()
+model_lr.fit(X_train, y_train)
+y_pred_lr = model_lr.predict(X_test)
+
+
+model_rf = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+model_rf.fit(X_train, y_train)
+y_pred_rf = model_rf.predict(X_test)
+
+
+def get_metrics(y_true, y_pred):
+    return {
+        "Acc": accuracy_score(y_true, y_pred),
+        "Prec": precision_score(y_true, y_pred, zero_division=0),
+        "Rec": recall_score(y_true, y_pred, zero_division=0),
+        "F1": f1_score(y_true, y_pred, zero_division=0)
+    }
+
+metrics_lr = get_metrics(y_test, y_pred_lr)
+metrics_rf = get_metrics(y_test, y_pred_rf)
+
+# ==========================================
+# ==========================================
+
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.subheader("🤖 Challenger 1: Logistic Regression")
+    st.caption("Sees the world in straight lines.")
+    fig_lr = plot_decision_boundary(model_lr, X, y, "Linear Decision Boundary", 'Tealgrn')
+    st.plotly_chart(fig_lr, use_container_width=True)
+
+with col2:
+    st.subheader("🌲 Challenger 2: Random Forest")
+    st.caption(f"Uses {n_estimators} decision trees to carve complex shapes.")
+    fig_rf = plot_decision_boundary(model_rf, X, y, "Ensemble Decision Boundary", 'RdPu')
+    st.plotly_chart(fig_rf, use_container_width=True)
+
+st.markdown("---")
+c_chart, c_metrics = st.columns([1, 1])
+
+with c_chart:
+    st.plotly_chart(plot_radar_chart(metrics_lr, metrics_rf), use_container_width=True)
+
+with c_metrics:
+    st.subheader("🏆 Match Results")
+    
+    
+    def display_comparison(label, val_lr, val_rf):
+        delta = val_rf - val_lr
+        color = "green" if delta > 0 else "red"
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: #262730; border-radius: 5px;">
+            <span style="color: #ccc;">{label}</span>
+            <span>
+                <span style="color: #00f2c3;">LR: {val_lr:.2f}</span> | 
+                <span style="color: #ff00ff;">RF: {val_rf:.2f}</span>
+                <span style="color: {color}; font-weight: bold; margin-left: 10px;">({'statistically' if delta == 0 else ('+' if delta > 0 else '')}{delta:.2f})</span>
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    display_comparison("Accuracy", metrics_lr['Acc'], metrics_rf['Acc'])
+    display_comparison("Precision", metrics_lr['Prec'], metrics_rf['Prec'])
+    display_comparison("Recall", metrics_lr['Rec'], metrics_rf['Rec'])
+    display_comparison("F1 Score", metrics_lr['F1'], metrics_rf['F1'])
+    
+    winner = "Random Forest" if metrics_rf['Acc'] > metrics_lr['Acc'] else "Logistic Regression" if metrics_lr['Acc'] > metrics_rf['Acc'] else "Draw"
+    st.success(f"**Current Winner:** {winner}")
+
+with st.expander("💡 Why does this happen?"):
+    st.write("""
+    * **Logistic Regression** draws a single straight line to separate data. It fails on 'Moon' or 'Circle' data because you can't cut a circle with one straight knife cut.
+    * **Random Forest** uses many "Decision Trees". Imagine it playing '20 Questions' to box in the data points. This allows it to capture curves and complex shapes.
+    """)
